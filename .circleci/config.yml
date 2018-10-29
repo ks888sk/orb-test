@@ -3,7 +3,7 @@ orbs:
     executors:
       default:
         docker:
-          - image: circleci/ruby:1.4.2
+          - image: circleci/node
     commands:
       dospecialthings:
         steps:
