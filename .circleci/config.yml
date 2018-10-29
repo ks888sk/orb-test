@@ -5,15 +5,22 @@ orbs:
         docker:
           - image: circleci/node
     commands:
-      dospecialthings:
+      printEnvs:
         steps:
-          - run: echo "We will now do special things"
+          - run: echo "${CIRCLE_REPOSITORY_URL}"
+          - run: echo "${CIRCLE_PROJECT_USERNAME}"
+          - run: echo "${CIRCLE_PROJECT_REPONAME}"
+          - run: echo "${CIRCLE_SHA1}"
+          - run: echo "${CIRCLE_BRANCH}"
+      letItFail:
+        steps:
+          - run: false
     jobs:
       myjob:
         executor: default
         steps:
-          - dospecialthings
-
+          - printEnvs
+          - letItFail
 version: 2.1
 workflows:
   main:
