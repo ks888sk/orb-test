@@ -5,22 +5,22 @@ orbs:
         docker:
           - image: circleci/node
     commands:
-      printEnvs:
+      print_envs:
         steps:
           - run: echo "${CIRCLE_REPOSITORY_URL}"
           - run: echo "${CIRCLE_PROJECT_USERNAME}"
           - run: echo "${CIRCLE_PROJECT_REPONAME}"
           - run: echo "${CIRCLE_SHA1}"
           - run: echo "${CIRCLE_BRANCH}"
-      letItFail:
+      let_it_fail:
         steps:
-          - run: false
+          - run: "false"
     jobs:
       myjob:
         executor: default
         steps:
-          - printEnvs
-          - letItFail
+          - print_envs
+          - let_it_fail
 version: 2.1
 workflows:
   main:
