@@ -1,0 +1,163 @@
+version: 2.1
+
+description: |
+  Run a new inspecode job.
+
+examples:
+  simple:
+    description: |
+      Run a new inspecode job using the commit associated with this CircleCI job.
+    usage:
+      version: 2.1
+      orbs:
+        inspecode: rocro/inspecode@1.0.0
+      workflows:
+        run_inspecode_job:
+          jobs:
+            - inspecode/run:
+                api_token: <Your API Key>
+
+jobs:
+  run:
+    description: Run an inspecode job and wait for it to complete
+    executor: default
+    parameters:
+      api_token:
+        description: Your API token to access the Inspecode API
+        type: string
+        default: "${INSPECODE_API_TOKEN}"
+      service:
+        description: Your VCS provider
+        type: enum
+        enum: ["github", "bitbucket"]
+        default: "github"
+      account_name:
+        description: Your user or organization name
+        type: string
+        default: "${CIRCLE_PROJECT_USERNAME}"
+      repo_name:
+        description: Your repository name
+        type: string
+        default: "${CIRCLE_PROJECT_REPONAME}"
+      branch_name:
+        description: The branch name
+        type: string
+        default: "${CIRCLE_BRANCH}"
+      commit_sha:
+        description: The SHA-1 of the commit
+        type: string
+        default: "${CIRCLE_SHA1}"
+    steps:
+      - run_job:
+          api_token: << parameters.api_token >>
+          service: << parameters.service >>
+          account_name: << parameters.account_name >>
+          repo_name: << parameters.repo_name >>
+          branch_name: << parameters.branch_name >>
+          commit_sha: << parameters.commit_sha >>
+      - wait_job:
+          api_token: << parameters.api_token >>
+          service: << parameters.service >>
+          account_name: << parameters.account_name >>
+          repo_name: << parameters.repo_name >>
+
+commands:
+  run_job:
+    description: Run a new inspecode job
+    parameters:
+      api_token:
+        description: Your API token to access the Inspecode API
+        type: string
+      service:
+        description: Your VCS provider
+        type: enum
+        enum: ["github", "bitbucket"]
+      account_name:
+        description: Your user or organization name
+        type: string
+      repo_name:
+        description: Your repository name
+        type: string
+      branch_name:
+        description: The branch name
+        type: string
+      commit_sha:
+        description: The SHA-1 of the commit
+        type: string
+    steps:
+      - run:
+          name: Run a new inspecode job
+          command: |
+            if [ << parameters.service >> = "github" ]; then
+              INSPECODE_API_SERVICE_URL="github.com"
+            else
+              INSPECODE_API_SERVICE_URL="bitbucket.org"
+            fi
+            INSPECODE_API_URL="https://inspecode.rocro.com/api/1/jobs/${INSPECODE_API_SERVICE_URL}/<< parameters.account_name >>/<< parameters.repo_name >>"
+            echo "The request url is: ${INSPECODE_API_URL}"
+
+            INSPECODE_API_REQUEST_BODY="{\"branch\":\"<< parameters.branch_name >>\",\"commit\":\"<< parameters.commit_sha >>\"}"
+            echo "The request body is: ${INSPECODE_API_REQUEST_BODY}"
+
+            INSPECODE_API_RESPONSE_BODY="$(curl --request POST --retry 3 --silent --show-error --fail \
+              -H "X-API-Key: << parameters.api_token >>" \
+              --data "${INSPECODE_API_REQUEST_BODY}" "${INSPECODE_API_URL}")"
+            echo "The response body is: ${INSPECODE_API_RESPONSE_BODY}"
+
+            INSPECODE_API_JOB_ID="$(echo "${INSPECODE_API_RESPONSE_BODY}" | python3 -c "import sys, json; print(json.load(sys.stdin)['jobID'])")"
+            echo "export INSPECODE_API_JOB_ID='${INSPECODE_API_JOB_ID}'" >> $BASH_ENV
+            echo "The job id is: ${INSPECODE_API_JOB_ID}"
+
+            INSPECODE_API_REPORT_URL="https://inspecode.rocro.com/jobs/${INSPECODE_API_SERVICE_URL}/<< parameters.account_name >>/<< parameters.repo_name >>/${INSPECODE_API_JOB_ID}"
+            echo "Access ${INSPECODE_API_REPORT_URL} to see the progress."
+
+  wait_job:
+    description: Wait for the job to complete
+    parameters:
+      api_token:
+        description: Your API token to access the Inspecode API
+        type: string
+      service:
+        description: Your VCS provider
+        type: enum
+        enum: ["github", "bitbucket"]
+      account_name:
+        description: Your user or organization name
+        type: string
+      repo_name:
+        description: Your repository name
+        type: string
+    steps:
+      - run:
+          name: Wait for the job to complete
+          command: |
+            if [ << parameters.service >> = "github" ]; then
+              INSPECODE_API_SERVICE_URL="github.com"
+            else
+              INSPECODE_API_SERVICE_URL="bitbucket.org"
+            fi
+            INSPECODE_API_URL="https://inspecode.rocro.com/api/1/jobs/${INSPECODE_API_SERVICE_URL}/<< parameters.account_name >>/<< parameters.repo_name >>/${INSPECODE_API_JOB_ID}/status"
+            echo "The request url is: ${INSPECODE_API_URL}"
+
+            while :; do
+              INSPECODE_API_RESPONSE_BODY="$(curl --retry 3 --silent --show-error --fail \
+                -H "X-API-Key: << parameters.api_token >>" \
+                "${INSPECODE_API_URL}")"
+              if echo "${INSPECODE_API_RESPONSE_BODY}" | grep '"succeeded"\|"failed"\|"canceled"\|"aborted"\|"timed out"\|"skipped"\|"stopped"' >/dev/null; then
+                break
+              fi
+              sleep 5
+              echo -n "."
+            done
+            echo "The response body is: ${INSPECODE_API_RESPONSE_BODY}"
+
+            INSPECODE_API_STATUS="$(echo "${INSPECODE_API_RESPONSE_BODY}" | python3 -c "import sys, json; print(json.load(sys.stdin)['status'])")"
+            echo "The last status is: ${INSPECODE_API_STATUS}"
+
+            INSPECODE_API_REPORT_URL="https://inspecode.rocro.com/reports/${INSPECODE_API_SERVICE_URL}/<< parameters.account_name >>/<< parameters.repo_name >>/${INSPECODE_API_JOB_ID}/summary"
+            echo "Access ${INSPECODE_API_REPORT_URL} to see the report."
+
+executors:
+  default:
+    docker:
+      - image: python:3
