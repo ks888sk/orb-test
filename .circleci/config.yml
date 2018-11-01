@@ -3,7 +3,7 @@ orbs:
     executors:
       default:
         docker:
-          - image: python:3-slim
+          - image: python:3
     commands:
       run_job:
         description: Run a new inspecode job.
