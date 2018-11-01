@@ -51,6 +51,11 @@ orbs:
               command: |
                 INSPECODE_API_REQUEST_BODY="{\"branch\":\"<< parameters.branch_name >>\", \"commit\":\"<< parameters.commit_sha >>\"}"
           - run:
+              name: Debug.
+              command: |
+                echo $INSPECODE_API_URL
+                echo $INSPECODE_API_REQUEST_BODY
+          - run:
               name: Send the request.
               command: |
                 INSPECODE_API_RESPONSE_BODY="$(curl --request POST --retry 3 --fail -H "X-API-Key: << parameters.api_token >>" \
